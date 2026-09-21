@@ -17,7 +17,12 @@ struct TaskPoolView: View {
     @State private var actionError: String?
 
     private var filteredTasks: [PoolTask] {
-        openTasks.filter { filters.matches($0) }
+        openTasks
+            .filter { filters.matches($0) }
+            .sorted { lhs, rhs in
+                if lhs.isActive != rhs.isActive { return lhs.isActive && !rhs.isActive }
+                return false
+            }
     }
 
     var body: some View {

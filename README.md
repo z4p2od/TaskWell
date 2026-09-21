@@ -24,7 +24,7 @@ xcodebuild -scheme TaskWell -destination 'platform=iOS Simulator,name=iPhone 17'
 
 - **Quick add** — title required; optional due date, effort, enjoyment, duration
 - **Pool** — open tasks with effort / enjoyment / due filters; swipe Done or Delete
-- **Suggest** — presets (easy win / ~30 min / important / surprise me) → one card with Accept / Skip / Snooze
+- **Suggest** — presets → one card with Accept / Skip / Snooze. **Accept** starts the task (in progress); **Done** completes it.
 - **Done** — completed history with reopen/delete
 
 ## Project layout

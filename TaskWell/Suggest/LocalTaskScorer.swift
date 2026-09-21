@@ -11,6 +11,7 @@ struct LocalTaskScorer: TaskSuggesting {
     ) -> PoolTask? {
         let candidates = tasks.filter { task in
             task.isOpen
+                && !task.isActive
                 && !excluding.contains(task.id)
                 && !task.isSnoozed
         }

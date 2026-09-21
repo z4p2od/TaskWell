@@ -27,6 +27,10 @@ final class PoolTask {
     var isCompleted: Bool = false
     var completedAt: Date?
 
+    /// User accepted this suggestion and is working on it. Not completed yet.
+    var isActive: Bool = false
+    var acceptedAt: Date?
+
     /// Soft-hide until this date (suggest snooze). Nil means available.
     var snoozedUntil: Date?
 
@@ -52,6 +56,8 @@ final class PoolTask {
         self.updatedAt = createdAt
         self.isCompleted = false
         self.completedAt = nil
+        self.isActive = false
+        self.acceptedAt = nil
         self.snoozedUntil = nil
         self.schemaVersion = 1
     }
@@ -76,9 +82,27 @@ final class PoolTask {
         updatedAt = Date()
     }
 
+    /// Accept = commit / start. Does **not** complete the task.
+    func markAccepted(at date: Date = Date()) {
+        isActive = true
+        acceptedAt = date
+        snoozedUntil = nil
+        touch()
+    }
+
+    /// Put an accepted task back in the pool without completing it.
+    func clearActive() {
+        isActive = false
+        acceptedAt = nil
+        touch()
+    }
+
+    /// Done = actually finished.
     func markCompleted(at date: Date = Date()) {
         isCompleted = true
         completedAt = date
+        isActive = false
+        acceptedAt = nil
         snoozedUntil = nil
         touch()
     }
@@ -86,11 +110,15 @@ final class PoolTask {
     func reopen() {
         isCompleted = false
         completedAt = nil
+        isActive = false
+        acceptedAt = nil
         touch()
     }
 
     func snooze(until date: Date) {
         snoozedUntil = date
+        isActive = false
+        acceptedAt = nil
         touch()
     }
 

@@ -11,6 +11,10 @@ struct TaskRowView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 10) {
+                if task.isActive {
+                    Label("In progress", systemImage: "flag.fill")
+                        .foregroundStyle(TaskWellTheme.coral)
+                }
                 if let dueDate = task.dueDate {
                     Label(dueLabel(dueDate), systemImage: "calendar")
                         .foregroundStyle(dueColor(dueDate))
