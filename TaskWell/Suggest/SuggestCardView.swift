@@ -15,6 +15,7 @@ struct SuggestCardView: View {
     var onAccept: (() -> Void)? = nil
     var onDone: (() -> Void)? = nil
     var onRelease: (() -> Void)? = nil
+    var onEdit: (() -> Void)? = nil
     var onSkip: (() -> Void)? = nil
     var onSnooze: (() -> Void)? = nil
 
@@ -137,13 +138,23 @@ struct SuggestCardView: View {
 
     private var activeActions: some View {
         VStack(spacing: 0) {
-            Button {
-                onRelease?()
-            } label: {
-                Label("Put back", systemImage: "arrow.uturn.backward")
-                    .frame(maxWidth: .infinity)
+            HStack(spacing: 12) {
+                Button {
+                    onEdit?()
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SecondaryWellButtonStyle())
+
+                Button {
+                    onRelease?()
+                } label: {
+                    Label("Put back", systemImage: "arrow.uturn.backward")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SecondaryWellButtonStyle())
             }
-            .buttonStyle(SecondaryWellButtonStyle())
             .padding(.top, 18)
 
             Button {

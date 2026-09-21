@@ -14,6 +14,7 @@ struct TaskPoolView: View {
 
     @State private var filters = TaskPoolFilters()
     @State private var showAdd = false
+    @State private var taskToEdit: PoolTask?
     @State private var actionError: String?
 
     private var filteredTasks: [PoolTask] {
@@ -62,25 +63,38 @@ struct TaskPoolView: View {
 
                         Section {
                             ForEach(filteredTasks, id: \.id) { task in
-                                TaskRowView(task: task)
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                        Button(role: .destructive) {
-                                            delete(task)
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
+                                Button {
+                                    taskToEdit = task
+                                } label: {
+                                    TaskRowView(task: task)
+                                }
+                                .buttonStyle(.plain)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        delete(task)
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
                                     }
-                                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                        Button {
-                                            complete(task)
-                                        } label: {
-                                            Label("Done", systemImage: "checkmark.circle.fill")
-                                        }
-                                        .tint(TaskWellTheme.well)
+                                    Button {
+                                        taskToEdit = task
+                                    } label: {
+                                        Label("Edit", systemImage: "pencil")
                                     }
+                                    .tint(TaskWellTheme.wellDeep)
+                                }
+                                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                    Button {
+                                        complete(task)
+                                    } label: {
+                                        Label("Done", systemImage: "checkmark.circle.fill")
+                                    }
+                                    .tint(TaskWellTheme.well)
+                                }
                             }
                         } header: {
                             Text("\(filteredTasks.count) open")
+                        } footer: {
+                            Text("Tap a task to edit. Swipe Done or Delete.")
                         }
                     }
                     .listStyle(.insetGrouped)
@@ -144,7 +158,20 @@ struct TaskPoolView: View {
                 }
             }
             .sheet(isPresented: $showAdd) {
-                QuickAddSheet()
+                TaskEditorSheet(mode: .create)
+            }
+            .sheet(item: $taskToEdit) { task in
+                TaskEditorSheet(mode: .edit(task))
+            }
+            .onAppear {
+                // Screenshot helper when launched on Pool tab with -demoEditSheet.
+                let args = ProcessInfo.processInfo.arguments
+                guard args.contains("-demoEditSheet") else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                    if taskToEdit == nil, let first = openTasks.first {
+                        taskToEdit = first
+                    }
+                }
             }
         }
     }

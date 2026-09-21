@@ -82,6 +82,22 @@ final class PoolTask {
         updatedAt = Date()
     }
 
+    /// Update capture fields only — does not change active or completed state.
+    func applyDetails(
+        title: String,
+        dueDate: Date?,
+        effort: EffortLevel?,
+        enjoyment: EnjoymentLevel?,
+        durationMinutes: Int?
+    ) {
+        self.title = title
+        self.dueDate = dueDate
+        self.effortRaw = effort?.rawValue
+        self.enjoymentRaw = enjoyment?.rawValue
+        self.durationMinutes = durationMinutes
+        touch()
+    }
+
     /// Accept = commit / start. Does **not** complete the task.
     func markAccepted(at date: Date = Date()) {
         isActive = true
@@ -131,3 +147,5 @@ final class PoolTask {
         !isCompleted
     }
 }
+
+extension PoolTask: Identifiable {}

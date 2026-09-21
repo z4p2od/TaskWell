@@ -17,6 +17,7 @@ struct SuggestView: View {
     @State private var isDrawing = false
     @State private var showAdd = false
     @State private var showCustomMood = false
+    @State private var taskToEdit: PoolTask?
     @State private var lastCustomDial = CustomSuggestDial.default
 
     private let scorer: any TaskSuggesting = LocalTaskScorer()
@@ -52,7 +53,8 @@ struct SuggestView: View {
                             moodTitle: selectedMood?.displayTitle,
                             mode: .active,
                             onDone: { complete(active) },
-                            onRelease: { release(active) }
+                            onRelease: { release(active) },
+                            onEdit: { taskToEdit = active }
                         )
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -120,7 +122,10 @@ struct SuggestView: View {
                 }
             }
             .sheet(isPresented: $showAdd) {
-                QuickAddSheet()
+                TaskEditorSheet(mode: .create)
+            }
+            .sheet(item: $taskToEdit) { task in
+                TaskEditorSheet(mode: .edit(task))
             }
             .sheet(isPresented: $showCustomMood) {
                 CustomMoodSheet(initial: lastCustomDial) { dial in
@@ -134,7 +139,7 @@ struct SuggestView: View {
         }
     }
 
-    /// Screenshot helpers: `-demoSuggestCard`, `-demoActiveCard`, `-demoCustomMood`.
+    /// Screenshot helpers: `-demoSuggestCard`, `-demoActiveCard`, `-demoCustomMood`, `-demoEditSheet`, `-demoAddSheet`.
     private func autoDrawForDemoIfNeeded() {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-demoActiveCard") {
@@ -148,6 +153,22 @@ struct SuggestView: View {
                 } else if let first = openTasks.first(where: { !$0.isSnoozed }) {
                     accept(first)
                 }
+            }
+            return
+        }
+
+        if args.contains("-demoEditSheet") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                if let first = openTasks.first {
+                    taskToEdit = first
+                }
+            }
+            return
+        }
+
+        if args.contains("-demoAddSheet") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                showAdd = true
             }
             return
         }
