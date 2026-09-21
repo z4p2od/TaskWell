@@ -159,6 +159,16 @@ struct SuggestView: View {
             return
         }
 
+        if args.contains("-demoCustomCard") {
+            guard selectedMood == nil, !showingActiveFocus else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                let dial = CustomSuggestDial(minutesAvailable: 25, appetite: 0.3)
+                lastCustomDial = dial
+                drawSuggestion(mood: .custom(dial))
+            }
+            return
+        }
+
         guard args.contains("-demoSuggestCard") else { return }
         guard selectedMood == nil, !showingActiveFocus else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
