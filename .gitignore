@@ -3,14 +3,42 @@ DerivedData/
 build/
 *.xcuserstate
 xcuserdata/
+*.xccheckout
+*.xcscmblueprint
 *.moved-aside
 *.hmap
 *.ipa
 *.dSYM.zip
 *.dSYM
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .swiftpm/
 .DS_Store
 *.playground
+timeline.xctimeline
+playground.xcworkspace
 
-# App packaging
+# App packaging / archives
 *.app
+*.xcarchive
+
+# CocoaPods / Carthage / SPM (if added later)
+Pods/
+Carthage/Build/
+.spm/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Secrets / local overrides
+*.xcconfig.local
+.env
+.env.*
+!.env.example
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon?
