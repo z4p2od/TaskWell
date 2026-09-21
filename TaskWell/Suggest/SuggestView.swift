@@ -9,13 +9,15 @@ struct SuggestView: View {
     )
     private var openTasks: [PoolTask]
 
-    @State private var selectedPreset: SuggestPreset?
+    @State private var selectedMood: SuggestMood?
     @State private var currentTask: PoolTask?
     @State private var showingActiveFocus = false
     @State private var skippedIDs: Set<UUID> = []
     @State private var actionError: String?
     @State private var isDrawing = false
     @State private var showAdd = false
+    @State private var showCustomMood = false
+    @State private var lastCustomDial = CustomSuggestDial.default
 
     private let scorer: any TaskSuggesting = LocalTaskScorer()
 
@@ -36,8 +38,10 @@ struct SuggestView: View {
                     if let actionError {
                         ErrorBanner(message: actionError) {
                             self.actionError = nil
-                            if let selectedPreset {
-                                drawSuggestion(for: selectedPreset)
+                            if let selectedMood {
+                                drawSuggestion(mood: selectedMood)
+                            } else {
+                                showCustomMood = true
                             }
                         }
                     }
@@ -45,7 +49,7 @@ struct SuggestView: View {
                     if showingActiveFocus, let active = activeTask {
                         SuggestCardView(
                             task: active,
-                            preset: selectedPreset,
+                            moodTitle: selectedMood?.displayTitle,
                             mode: .active,
                             onDone: { complete(active) },
                             onRelease: { release(active) }
@@ -58,21 +62,21 @@ struct SuggestView: View {
                         Button("Suggest something else") {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 showingActiveFocus = false
-                                selectedPreset = nil
+                                selectedMood = nil
                                 currentTask = nil
                             }
                         }
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(TaskWellTheme.muted)
                         .frame(maxWidth: .infinity)
-                    } else if let selectedPreset, let currentTask {
+                    } else if let selectedMood, let currentTask {
                         SuggestCardView(
                             task: currentTask,
-                            preset: selectedPreset,
+                            moodTitle: selectedMood.displayTitle,
                             mode: .suggestion,
                             onAccept: { accept(currentTask) },
-                            onSkip: { skip(currentTask, preset: selectedPreset) },
-                            onSnooze: { snooze(currentTask, preset: selectedPreset) }
+                            onSkip: { skip(currentTask, mood: selectedMood) },
+                            onSnooze: { snooze(currentTask, mood: selectedMood) }
                         )
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -118,14 +122,19 @@ struct SuggestView: View {
             .sheet(isPresented: $showAdd) {
                 QuickAddSheet()
             }
+            .sheet(isPresented: $showCustomMood) {
+                CustomMoodSheet(initial: lastCustomDial) { dial in
+                    lastCustomDial = dial
+                    drawSuggestion(mood: .custom(dial))
+                }
+            }
             .onAppear {
                 autoDrawForDemoIfNeeded()
             }
         }
     }
 
-    /// Screenshot helper: `-demoSuggestCard` draws an Easy win card after seed.
-    /// `-demoActiveCard` seeds and focuses an accepted (in-progress) card.
+    /// Screenshot helpers: `-demoSuggestCard`, `-demoActiveCard`, `-demoCustomMood`.
     private func autoDrawForDemoIfNeeded() {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-demoActiveCard") {
@@ -133,7 +142,7 @@ struct SuggestView: View {
                 if let active = activeTask {
                     withAnimation {
                         showingActiveFocus = true
-                        selectedPreset = .easyWin
+                        selectedMood = .preset(.easyWin)
                         currentTask = active
                     }
                 } else if let first = openTasks.first(where: { !$0.isSnoozed }) {
@@ -143,10 +152,17 @@ struct SuggestView: View {
             return
         }
 
+        if args.contains("-demoCustomMood") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                showCustomMood = true
+            }
+            return
+        }
+
         guard args.contains("-demoSuggestCard") else { return }
-        guard selectedPreset == nil, !showingActiveFocus else { return }
+        guard selectedMood == nil, !showingActiveFocus else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-            drawSuggestion(for: .easyWin)
+            drawSuggestion(mood: .preset(.easyWin))
         }
     }
 
@@ -179,7 +195,7 @@ struct SuggestView: View {
         if showingActiveFocus {
             return "Accepted means you’re on it. Tap Done only when the work is finished."
         }
-        if selectedPreset != nil {
+        if selectedMood != nil {
             return "Accept to start this one — it stays open until you mark it Done."
         }
         return "Tell the well how much time or energy you have. It pulls one task."
@@ -189,7 +205,7 @@ struct SuggestView: View {
         Button {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.86)) {
                 showingActiveFocus = true
-                selectedPreset = selectedPreset ?? .easyWin
+                selectedMood = selectedMood ?? .preset(.easyWin)
                 currentTask = task
             }
         } label: {
@@ -256,47 +272,68 @@ struct SuggestView: View {
                     spacing: 12
                 ) {
                     ForEach(SuggestPreset.allCases) { preset in
-                        Button {
-                            drawSuggestion(for: preset)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Image(systemName: preset.symbolName)
-                                    .font(.title3.weight(.semibold))
-                                    .foregroundStyle(TaskWellTheme.well)
-                                Text(preset.title)
-                                    .font(.headline)
-                                    .foregroundStyle(TaskWellTheme.ink)
-                                Text(preset.subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(TaskWellTheme.muted)
-                                    .multilineTextAlignment(.leading)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            .padding(16)
-                            .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
-                            .background(Color.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    .strokeBorder(TaskWellTheme.well.opacity(0.1), lineWidth: 1)
-                            )
+                        moodTile(
+                            title: preset.title,
+                            subtitle: preset.subtitle,
+                            symbol: preset.symbolName
+                        ) {
+                            drawSuggestion(mood: .preset(preset))
                         }
-                        .buttonStyle(.plain)
+                    }
+
+                    moodTile(
+                        title: "Custom…",
+                        subtitle: "Set your time and appetite",
+                        symbol: "slider.horizontal.3"
+                    ) {
+                        showCustomMood = true
                     }
                 }
             }
         }
     }
 
-    private func drawSuggestion(for preset: SuggestPreset) {
+    private func moodTile(
+        title: String,
+        subtitle: String,
+        symbol: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: symbol)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(TaskWellTheme.well)
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(TaskWellTheme.ink)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(TaskWellTheme.muted)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+            .background(Color.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(TaskWellTheme.well.opacity(0.1), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func drawSuggestion(mood: SuggestMood) {
         actionError = nil
         isDrawing = true
-        selectedPreset = preset
+        selectedMood = mood
         showingActiveFocus = false
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
             let next = scorer.suggest(
                 from: openTasks,
-                preset: preset,
+                mood: mood,
                 excluding: skippedIDs,
                 now: Date()
             )
@@ -304,16 +341,23 @@ struct SuggestView: View {
                 currentTask = next
                 isDrawing = false
                 if next == nil {
-                    actionError = skippedIDs.isEmpty
-                        ? "No open tasks fit that mood right now. Try another preset or add to the pool."
-                        : "You’ve skipped through the matching tasks. Reset or pick a different mood."
+                    actionError = emptyFitMessage(for: mood)
                 }
             }
         }
     }
 
+    private func emptyFitMessage(for mood: SuggestMood) -> String {
+        if !skippedIDs.isEmpty {
+            return "You’ve skipped through the matching tasks. Reset or adjust your mood."
+        }
+        if case .custom = mood {
+            return "Nothing in the pool fits that time and appetite. Loosen a dial, or add a task that matches."
+        }
+        return "No open tasks fit that mood right now. Try another preset or add to the pool."
+    }
+
     private func accept(_ task: PoolTask) {
-        // One focus at a time — clear any prior active task.
         for other in openTasks where other.isActive && other.id != task.id {
             other.clearActive()
         }
@@ -341,27 +385,27 @@ struct SuggestView: View {
             withAnimation {
                 showingActiveFocus = false
                 currentTask = nil
-                selectedPreset = nil
+                selectedMood = nil
             }
         }
     }
 
-    private func skip(_ task: PoolTask, preset: SuggestPreset) {
+    private func skip(_ task: PoolTask, mood: SuggestMood) {
         skippedIDs.insert(task.id)
-        drawSuggestion(for: preset)
+        drawSuggestion(mood: mood)
     }
 
-    private func snooze(_ task: PoolTask, preset: SuggestPreset) {
+    private func snooze(_ task: PoolTask, mood: SuggestMood) {
         let later = Calendar.current.date(byAdding: .hour, value: 4, to: Date()) ?? Date().addingTimeInterval(4 * 3600)
         task.snooze(until: later)
         skippedIDs.insert(task.id)
         persist("Couldn’t snooze that task. Try again.") {
-            drawSuggestion(for: preset)
+            drawSuggestion(mood: mood)
         }
     }
 
     private func resetSuggestionOnly() {
-        selectedPreset = nil
+        selectedMood = nil
         currentTask = nil
         skippedIDs = []
         actionError = nil

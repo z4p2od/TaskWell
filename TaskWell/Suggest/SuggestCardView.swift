@@ -9,7 +9,8 @@ struct SuggestCardView: View {
     }
 
     let task: PoolTask
-    let preset: SuggestPreset?
+    /// Eyebrow label for the card (preset title or custom dial summary).
+    var moodTitle: String?
     var mode: Mode = .suggestion
     var onAccept: (() -> Void)? = nil
     var onDone: (() -> Void)? = nil
@@ -91,7 +92,7 @@ struct SuggestCardView: View {
     private var eyebrow: String {
         switch mode {
         case .suggestion:
-            return preset?.title ?? "Suggestion"
+            return moodTitle ?? "Suggestion"
         case .active:
             return "In progress"
         }
