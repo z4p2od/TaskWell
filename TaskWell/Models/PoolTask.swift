@@ -12,17 +12,29 @@ final class PoolTask {
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
 
+    /// Optional free-text blob used at capture (for learning / debug).
+    var rawCaptureText: String?
+
     /// Optional due date; nil means no deadline.
     var dueDate: Date?
 
-    /// EffortLevel.rawValue; nil means unset.
+    /// Estimated effort at capture (EffortLevel.rawValue).
     var effortRaw: Int?
 
-    /// EnjoymentLevel.rawValue; nil means unset.
+    /// Estimated enjoyment at capture (EnjoymentLevel.rawValue).
     var enjoymentRaw: Int?
 
-    /// Rough duration in minutes; nil means unset.
+    /// Estimated duration in minutes at capture.
     var durationMinutes: Int?
+
+    /// Completion truth — minutes actually taken (from Done confirm).
+    var actualDurationMinutes: Int?
+
+    /// Completion truth — effort felt (EffortLevel.rawValue).
+    var actualEffortRaw: Int?
+
+    /// Completion truth — enjoyment felt (EnjoymentLevel.rawValue).
+    var actualEnjoymentRaw: Int?
 
     var isCompleted: Bool = false
     var completedAt: Date?
@@ -35,7 +47,7 @@ final class PoolTask {
     var snoozedUntil: Date?
 
     /// Reserved for future CloudKit / Watch conflict stamps.
-    var schemaVersion: Int = 1
+    var schemaVersion: Int = 2
 
     init(
         id: UUID = UUID(),
@@ -44,6 +56,7 @@ final class PoolTask {
         effort: EffortLevel? = nil,
         enjoyment: EnjoymentLevel? = nil,
         durationMinutes: Int? = nil,
+        rawCaptureText: String? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -52,14 +65,18 @@ final class PoolTask {
         self.effortRaw = effort?.rawValue
         self.enjoymentRaw = enjoyment?.rawValue
         self.durationMinutes = durationMinutes
+        self.rawCaptureText = rawCaptureText
         self.createdAt = createdAt
         self.updatedAt = createdAt
+        self.actualDurationMinutes = nil
+        self.actualEffortRaw = nil
+        self.actualEnjoymentRaw = nil
         self.isCompleted = false
         self.completedAt = nil
         self.isActive = false
         self.acceptedAt = nil
         self.snoozedUntil = nil
-        self.schemaVersion = 1
+        self.schemaVersion = 2
     }
 
     var effort: EffortLevel? {
@@ -76,6 +93,35 @@ final class PoolTask {
             enjoymentRaw = newValue?.rawValue
             touch()
         }
+    }
+
+    var actualEffort: EffortLevel? {
+        get { actualEffortRaw.flatMap(EffortLevel.init(rawValue:)) }
+        set {
+            actualEffortRaw = newValue?.rawValue
+            touch()
+        }
+    }
+
+    var actualEnjoyment: EnjoymentLevel? {
+        get { actualEnjoymentRaw.flatMap(EnjoymentLevel.init(rawValue:)) }
+        set {
+            actualEnjoymentRaw = newValue?.rawValue
+            touch()
+        }
+    }
+
+    /// Prefer completion truth for learning; fall back to capture estimates.
+    var learnedDurationMinutes: Int? {
+        actualDurationMinutes ?? durationMinutes
+    }
+
+    var learnedEffort: EffortLevel? {
+        actualEffort ?? effort
+    }
+
+    var learnedEnjoyment: EnjoymentLevel? {
+        actualEnjoyment ?? enjoyment
     }
 
     func touch() {
@@ -113,13 +159,27 @@ final class PoolTask {
         touch()
     }
 
-    /// Done = actually finished.
-    func markCompleted(at date: Date = Date()) {
+    /// Done = actually finished, with optional completion truth for learning.
+    func markCompleted(
+        at date: Date = Date(),
+        actualDurationMinutes: Int? = nil,
+        actualEffort: EffortLevel? = nil,
+        actualEnjoyment: EnjoymentLevel? = nil
+    ) {
         isCompleted = true
         completedAt = date
         isActive = false
         acceptedAt = nil
         snoozedUntil = nil
+        if let actualDurationMinutes {
+            self.actualDurationMinutes = actualDurationMinutes
+        }
+        if let actualEffort {
+            self.actualEffortRaw = actualEffort.rawValue
+        }
+        if let actualEnjoyment {
+            self.actualEnjoymentRaw = actualEnjoyment.rawValue
+        }
         touch()
     }
 
@@ -128,6 +188,10 @@ final class PoolTask {
         completedAt = nil
         isActive = false
         acceptedAt = nil
+        // Keep actual* for history even if reopened? Clear so a new Done pass re-asks.
+        actualDurationMinutes = nil
+        actualEffortRaw = nil
+        actualEnjoymentRaw = nil
         touch()
     }
 

@@ -22,10 +22,11 @@ xcodebuild -scheme TaskWell -destination 'platform=iOS Simulator,name=iPhone 17'
 
 ## What’s in the MVP
 
-- **Quick add** — title required; optional due date, effort, enjoyment, duration
-- **Pool** — open tasks with effort / enjoyment / due filters; tap to edit; swipe Done or Delete
-- **Suggest** — presets or **Custom** (time + appetite dials) → one card with Accept / Skip / Snooze. **Accept** starts the task (in progress); **Done** completes it. Edit from the active card.
-- **Done** — completed history with reopen/delete
+- **Quick add** — free-text first (on-device parse + local/optional BYOK enrichment chips); structured fields under More options / Edit
+- **Pool** — open tasks with effort / enjoyment / due filters; tap to edit; swipe Done (confirm actuals) or Delete
+- **Suggest** — presets or **Custom** (time + appetite dials) → one card with Accept / Skip / Snooze. **Accept** starts the task (in progress); **Done** completes it with feedback. Edit from the active card.
+- **Done** — completed history with reopen/delete; stores actual minutes/effort/enjoyment for learning
+- **Settings** (Suggest gear) — optional OpenAI/Anthropic keys in Keychain; toggle AI enrichment
 
 ## Project layout
 

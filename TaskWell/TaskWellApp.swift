@@ -133,10 +133,29 @@ struct RootView: View {
             )
         }
 
-        // One completed item so Done isn’t empty in demos.
-        let done = PoolTask(title: "Water the plants", effort: .quick, enjoyment: .enjoy, durationMinutes: 5)
-        done.markCompleted(at: Date().addingTimeInterval(-3600))
-        modelContext.insert(done)
+        // Completed items with actuals so similarity learning has something to chew on.
+        let plants = PoolTask(title: "Water the plants", effort: .quick, enjoyment: .enjoy, durationMinutes: 5)
+        plants.markCompleted(
+            at: Date().addingTimeInterval(-3600),
+            actualDurationMinutes: 8,
+            actualEffort: .quick,
+            actualEnjoyment: .enjoy
+        )
+        modelContext.insert(plants)
+
+        let groceries = PoolTask(
+            title: "Buy groceries for the week",
+            effort: .medium,
+            enjoyment: .meh,
+            durationMinutes: 40
+        )
+        groceries.markCompleted(
+            at: Date().addingTimeInterval(-86_400),
+            actualDurationMinutes: 45,
+            actualEffort: .medium,
+            actualEnjoyment: .dread
+        )
+        modelContext.insert(groceries)
 
         try? modelContext.save()
     }

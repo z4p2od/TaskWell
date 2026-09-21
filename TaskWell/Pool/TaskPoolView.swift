@@ -15,6 +15,7 @@ struct TaskPoolView: View {
     @State private var filters = TaskPoolFilters()
     @State private var showAdd = false
     @State private var taskToEdit: PoolTask?
+    @State private var taskAwaitingDone: PoolTask?
     @State private var actionError: String?
 
     private var filteredTasks: [PoolTask] {
@@ -158,18 +159,31 @@ struct TaskPoolView: View {
                 }
             }
             .sheet(isPresented: $showAdd) {
-                TaskEditorSheet(mode: .create)
+                FreeTextCaptureSheet()
             }
             .sheet(item: $taskToEdit) { task in
                 TaskEditorSheet(mode: .edit(task))
             }
+            .sheet(item: $taskAwaitingDone) { task in
+                DoneConfirmSheet(task: task) { duration, effort, enjoyment in
+                    confirmDone(task, duration: duration, effort: effort, enjoyment: enjoyment)
+                }
+            }
             .onAppear {
                 // Screenshot helper when launched on Pool tab with -demoEditSheet.
                 let args = ProcessInfo.processInfo.arguments
-                guard args.contains("-demoEditSheet") else { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                    if taskToEdit == nil, let first = openTasks.first {
-                        taskToEdit = first
+                if args.contains("-demoEditSheet") {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        if taskToEdit == nil, let first = openTasks.first {
+                            taskToEdit = first
+                        }
+                    }
+                }
+                if args.contains("-demoDoneConfirm") {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        if taskAwaitingDone == nil, let first = openTasks.first {
+                            taskAwaitingDone = first
+                        }
                     }
                 }
             }
@@ -177,7 +191,20 @@ struct TaskPoolView: View {
     }
 
     private func complete(_ task: PoolTask) {
-        task.markCompleted()
+        taskAwaitingDone = task
+    }
+
+    private func confirmDone(
+        _ task: PoolTask,
+        duration: Int?,
+        effort: EffortLevel?,
+        enjoyment: EnjoymentLevel?
+    ) {
+        task.markCompleted(
+            actualDurationMinutes: duration,
+            actualEffort: effort,
+            actualEnjoyment: enjoyment
+        )
         persist("Couldn’t mark that task done. Try again.")
     }
 

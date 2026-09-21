@@ -16,8 +16,10 @@ struct SuggestView: View {
     @State private var actionError: String?
     @State private var isDrawing = false
     @State private var showAdd = false
+    @State private var showSettings = false
     @State private var showCustomMood = false
     @State private var taskToEdit: PoolTask?
+    @State private var taskAwaitingDone: PoolTask?
     @State private var lastCustomDial = CustomSuggestDial.default
 
     private let scorer: any TaskSuggesting = LocalTaskScorer()
@@ -110,6 +112,15 @@ struct SuggestView: View {
             .taskWellScreenBackground()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .foregroundStyle(TaskWellTheme.ink.opacity(0.7))
+                    }
+                    .accessibilityLabel("Settings")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showAdd = true
@@ -122,10 +133,18 @@ struct SuggestView: View {
                 }
             }
             .sheet(isPresented: $showAdd) {
-                TaskEditorSheet(mode: .create)
+                FreeTextCaptureSheet()
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
             }
             .sheet(item: $taskToEdit) { task in
                 TaskEditorSheet(mode: .edit(task))
+            }
+            .sheet(item: $taskAwaitingDone) { task in
+                DoneConfirmSheet(task: task) { duration, effort, enjoyment in
+                    confirmDone(task, duration: duration, effort: effort, enjoyment: enjoyment)
+                }
             }
             .sheet(isPresented: $showCustomMood) {
                 CustomMoodSheet(initial: lastCustomDial) { dial in
@@ -168,6 +187,13 @@ struct SuggestView: View {
 
         if args.contains("-demoAddSheet") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                showAdd = true
+            }
+            return
+        }
+
+        if args.contains("-demoFreeText") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 showAdd = true
             }
             return
@@ -402,7 +428,20 @@ struct SuggestView: View {
     }
 
     private func complete(_ task: PoolTask) {
-        task.markCompleted()
+        taskAwaitingDone = task
+    }
+
+    private func confirmDone(
+        _ task: PoolTask,
+        duration: Int?,
+        effort: EffortLevel?,
+        enjoyment: EnjoymentLevel?
+    ) {
+        task.markCompleted(
+            actualDurationMinutes: duration,
+            actualEffort: effort,
+            actualEnjoyment: enjoyment
+        )
         persist("Couldn’t mark that task Done. Try again.") {
             withAnimation {
                 resetFlow()

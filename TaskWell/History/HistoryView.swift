@@ -74,10 +74,22 @@ struct HistoryView: View {
     }
 
     private func completedLabel(_ task: PoolTask) -> String {
+        var parts: [String] = []
         if let completedAt = task.completedAt {
-            return "Finished \(completedAt.formatted(date: .abbreviated, time: .shortened))"
+            parts.append("Finished \(completedAt.formatted(date: .abbreviated, time: .shortened))")
+        } else {
+            parts.append("Finished")
         }
-        return "Finished"
+        if let minutes = task.actualDurationMinutes ?? task.durationMinutes {
+            parts.append("\(minutes)m")
+        }
+        if let effort = task.learnedEffort {
+            parts.append(effort.title)
+        }
+        if let enjoyment = task.learnedEnjoyment {
+            parts.append(enjoyment.title)
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func reopen(_ task: PoolTask) {
