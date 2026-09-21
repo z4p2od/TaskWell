@@ -36,8 +36,7 @@ struct TaskWellApp: App {
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var storeHealthy = true
-    @State private var selectedTab = 0
-    @State private var showAdd = false
+    @State private var selectedTab = RootView.initialTab()
 
     var body: some View {
         Group {
@@ -62,30 +61,6 @@ struct RootView: View {
                         .tag(2)
                 }
                 .tint(TaskWellTheme.well)
-                .safeAreaInset(edge: .bottom) {
-                    // Floating quick-add affordance sits above the tab bar on Suggest.
-                    if selectedTab == 0 {
-                        HStack {
-                            Spacer()
-                            Button {
-                                showAdd = true
-                            } label: {
-                                Label("Quick add", systemImage: "plus")
-                                    .font(.subheadline.weight(.semibold))
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 10)
-                                    .background(TaskWellTheme.coral, in: Capsule())
-                                    .foregroundStyle(.white)
-                                    .shadow(color: TaskWellTheme.coral.opacity(0.35), radius: 10, y: 4)
-                            }
-                            .padding(.trailing, 20)
-                            .padding(.bottom, 8)
-                        }
-                    }
-                }
-                .sheet(isPresented: $showAdd) {
-                    QuickAddSheet()
-                }
             } else {
                 VStack {
                     EmptyStateView(
@@ -100,7 +75,23 @@ struct RootView: View {
                 .taskWellScreenBackground()
             }
         }
-        .onAppear { probeStore() }
+        .onAppear {
+            probeStore()
+            seedDemoDataIfRequested()
+        }
+    }
+
+    /// Screenshot helper: `-demoTab pool|done|suggest` (default suggest).
+    private static func initialTab() -> Int {
+        let args = ProcessInfo.processInfo.arguments
+        if let index = args.firstIndex(of: "-demoTab"), args.indices.contains(index + 1) {
+            switch args[index + 1].lowercased() {
+            case "pool": return 1
+            case "done", "history": return 2
+            default: return 0
+            }
+        }
+        return 0
     }
 
     private func probeStore() {
@@ -111,5 +102,42 @@ struct RootView: View {
         } catch {
             storeHealthy = false
         }
+    }
+
+    /// Simulator / screenshot helper: launch with `-seedDemoData` to preload sample tasks.
+    private func seedDemoDataIfRequested() {
+        guard ProcessInfo.processInfo.arguments.contains("-seedDemoData") else { return }
+
+        let existing = try? modelContext.fetch(FetchDescriptor<PoolTask>())
+        guard existing?.isEmpty != false else { return }
+
+        let cal = Calendar.current
+        let samples: [(String, EffortLevel?, EnjoymentLevel?, Int?, Date?)] = [
+            ("Reply to Maya about Friday dinner", .quick, .enjoy, 10, cal.date(byAdding: .hour, value: 5, to: Date())),
+            ("Clear the kitchen counter", .quick, .meh, 15, nil),
+            ("Draft Q3 budget notes", .medium, .dread, 30, cal.date(byAdding: .day, value: 1, to: Date())),
+            ("Walk around the block", .quick, .enjoy, 20, nil),
+            ("File last month’s receipts", .big, .dread, 60, cal.date(byAdding: .day, value: -1, to: Date())),
+            ("Read two chapters of the novel", .medium, .enjoy, 35, cal.date(byAdding: .day, value: 3, to: Date()))
+        ]
+
+        for sample in samples {
+            modelContext.insert(
+                PoolTask(
+                    title: sample.0,
+                    dueDate: sample.4,
+                    effort: sample.1,
+                    enjoyment: sample.2,
+                    durationMinutes: sample.3
+                )
+            )
+        }
+
+        // One completed item so Done isn’t empty in demos.
+        let done = PoolTask(title: "Water the plants", effort: .quick, enjoyment: .enjoy, durationMinutes: 5)
+        done.markCompleted(at: Date().addingTimeInterval(-3600))
+        modelContext.insert(done)
+
+        try? modelContext.save()
     }
 }

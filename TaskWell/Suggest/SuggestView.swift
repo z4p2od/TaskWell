@@ -14,6 +14,7 @@ struct SuggestView: View {
     @State private var skippedIDs: Set<UUID> = []
     @State private var actionError: String?
     @State private var isDrawing = false
+    @State private var showAdd = false
 
     private let scorer: any TaskSuggesting = LocalTaskScorer()
 
@@ -71,13 +72,33 @@ struct SuggestView: View {
             .taskWellScreenBackground()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("Suggest")
-                        .font(.headline)
-                        .foregroundStyle(TaskWellTheme.ink.opacity(0.01)) // keep nav slim; brand lives in hero
-                        .accessibilityHidden(true)
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showAdd = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(TaskWellTheme.coral)
+                    }
+                    .accessibilityLabel("Quick add")
                 }
             }
+            .sheet(isPresented: $showAdd) {
+                QuickAddSheet()
+            }
+            .onAppear {
+                autoDrawForDemoIfNeeded()
+            }
+        }
+    }
+
+    /// Screenshot helper: `-demoSuggestCard` draws an Easy win card after seed.
+    private func autoDrawForDemoIfNeeded() {
+        guard ProcessInfo.processInfo.arguments.contains("-demoSuggestCard") else { return }
+        guard selectedPreset == nil else { return }
+        // Wait a beat so seeded @Query results are visible.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            drawSuggestion(for: .easyWin)
         }
     }
 
@@ -120,8 +141,11 @@ struct SuggestView: View {
                 EmptyStateView(
                     symbolName: "drop.fill",
                     title: "Nothing in the well yet",
-                    message: "Add a few tasks to the pool first. Suggest needs something to draw from."
-                )
+                    message: "Add a few tasks to the pool first. Suggest needs something to draw from.",
+                    actionTitle: "Quick add"
+                ) {
+                    showAdd = true
+                }
                 .background(Color.white.opacity(0.55), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             } else if availableCount == 0 {
                 EmptyStateView(
