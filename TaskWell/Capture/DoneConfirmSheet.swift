@@ -11,8 +11,6 @@ struct DoneConfirmSheet: View {
     @State private var effort: EffortLevel?
     @State private var enjoyment: EnjoymentLevel?
 
-    private let durationChoices = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180]
-
     init(
         task: PoolTask,
         onConfirm: @escaping (_ duration: Int?, _ effort: EffortLevel?, _ enjoyment: EnjoymentLevel?) -> Void
@@ -38,12 +36,13 @@ struct DoneConfirmSheet: View {
                 }
 
                 Section("How it felt") {
-                    Picker("Minutes taken", selection: $durationMinutes) {
-                        Text("Skip").tag(Optional<Int>.none)
-                        ForEach(durationChoices, id: \.self) { minutes in
-                            Text(durationLabel(minutes)).tag(Optional(minutes))
-                        }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Minutes taken")
+                            .font(.subheadline)
+                            .foregroundStyle(TaskWellTheme.ink)
+                        DurationChipPicker(minutes: $durationMinutes)
                     }
+                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
 
                     Picker("Effort felt", selection: $effort) {
                         Text("Skip").tag(Optional<EffortLevel>.none)
@@ -79,12 +78,5 @@ struct DoneConfirmSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-    }
-
-    private func durationLabel(_ minutes: Int) -> String {
-        if minutes < 60 { return "\(minutes) min" }
-        let hours = minutes / 60
-        let rem = minutes % 60
-        return rem == 0 ? "\(hours) hr" : "\(hours) hr \(rem) min"
     }
 }

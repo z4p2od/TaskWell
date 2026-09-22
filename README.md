@@ -1,6 +1,6 @@
 # TaskWell
 
-iPhone MVP for a personal task **pool**: quick capture, then one-card suggestions when you have time.
+iPhone MVP for a personal task **pool**: structured capture, then one-card suggestions when you have time.
 
 Local-only SwiftUI + SwiftData. Designed so CloudKit sync, Apple Watch, App Intents/voice, and AI ranking can land without a rewrite.
 
@@ -22,30 +22,30 @@ xcodebuild -scheme TaskWell -destination 'platform=iOS Simulator,name=iPhone 17'
 
 ## What’s in the MVP
 
-- **Quick add** — free-text first (on-device parse + local/optional BYOK enrichment chips); structured fields under More options / Edit
-- **Pool** — open tasks with effort / enjoyment / due filters; tap to edit; swipe Done (confirm actuals) or Delete
-- **Suggest** — presets or **Custom** (time + appetite dials) → one card with Accept / Skip / Snooze. **Accept** starts the task (in progress); **Done** completes it with feedback. Edit from the active card.
-- **Done** — completed history with reopen/delete; stores actual minutes/effort/enjoyment for learning
-- **Settings** (Suggest gear) — optional OpenAI/Anthropic keys in Keychain; toggle AI enrichment
+- **Quick add** — structured form (title autofocus + optional due / effort / enjoyment / duration chips: 10m · 30m · 1h · 2h+ · Custom…). Unset duration = unknown. **2h+** stores 120 minutes.
+- **Pool** — available + in-progress first; **Snoozed** section when snoozed tasks exist; Status filter includes Snoozed; unsnooze via swipe / inline / edit.
+- **Suggest** — presets or **Custom** (time + appetite) → one card. **Skip** is session-only; **Snooze** opens a picker (1h / 4h / Tonight / Tomorrow morning / custom) → `snoozedUntil`. **Accept** starts the task; **Done** completes with feedback.
+- **Done** — completed history; stores actual minutes/effort/enjoyment for learning.
+- **Settings** (Suggest gear) — optional OpenAI/Anthropic keys in Keychain for future voice enrichment.
 
 ## Project layout
 
 | Folder | Role |
 |--------|------|
 | `Models/` | SwiftData `PoolTask` + enums (stable UUIDs, sync-friendly) |
-| `Capture/` | Quick-add sheet + App Intent stub |
-| `Pool/` | List, filters, rows |
-| `Suggest/` | `TaskSuggesting` protocol, `LocalTaskScorer`, card UI |
+| `Capture/` | Structured add/edit, Done confirm, parser/enrichment (voice-ready), App Intent |
+| `Pool/` | List, filters (incl. Snoozed), rows |
+| `Suggest/` | Scorer, card UI, snooze picker, custom mood |
 | `History/` | Completed log |
-| `Shared/` | Theme + empty/loading/error chrome |
+| `Shared/` | Theme + duration chips + empty/loading/error chrome |
 
 ## Future hooks
 
 - **CloudKit** — models already use stable `id: UUID` and scalar optionals. Turn on `cloudKitDatabase` in `TaskWellApp` once a Developer Team is set. Do not enable yet.
-- **Apple Watch** — Phase 2 companion can reuse `Models/` + `LocalTaskScorer` / `TaskSuggesting`; sync via WatchConnectivity first or CloudKit later.
-- **App Intents / voice** — `AddPoolTaskIntent` is stubbed in `Capture/`. Share a ModelContainer (app group) before shipping Shortcuts.
-- **AI ranking** — implement `TaskSuggesting` with an LLM-backed type and inject it where `SuggestView` currently uses `LocalTaskScorer`.
-- **Calendar / location** — extend `SuggestScoreContext` with EventKit free gaps or geofence signals; keep the protocol boundary.
+- **Apple Watch** — Phase 2 companion can reuse `Models/` + `LocalTaskScorer` / `TaskSuggesting`.
+- **App Intents / voice** — `AddPoolTaskIntent` parses a phrase into a pool task. Share a ModelContainer (app group) before shipping Shortcuts; present pre-filled `TaskEditorSheet` for confirm.
+- **AI ranking** — implement `TaskSuggesting` with an LLM-backed type where `SuggestView` uses `LocalTaskScorer`.
+- **Calendar / location** — extend `SuggestScoreContext` with EventKit or geofence signals.
 
 ## Design notes
 

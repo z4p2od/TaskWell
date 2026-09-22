@@ -121,16 +121,26 @@ struct RootView: View {
             ("Read two chapters of the novel", .medium, .enjoy, 35, cal.date(byAdding: .day, value: 3, to: Date()))
         ]
 
+        let calNow = Date()
         for sample in samples {
-            modelContext.insert(
-                PoolTask(
-                    title: sample.0,
-                    dueDate: sample.4,
-                    effort: sample.1,
-                    enjoyment: sample.2,
-                    durationMinutes: sample.3
-                )
+            let task = PoolTask(
+                title: sample.0,
+                dueDate: sample.4,
+                effort: sample.1,
+                enjoyment: sample.2,
+                durationMinutes: sample.3
             )
+            // Match design mockups: a couple of open tasks start snoozed for Pool demos.
+            if sample.0.hasPrefix("File last month") {
+                let tonight = cal.date(bySettingHour: 22, minute: 0, second: 0, of: calNow)
+                    ?? calNow.addingTimeInterval(4 * 3600)
+                task.snooze(until: tonight)
+            } else if sample.0.hasPrefix("Read two chapters") {
+                let next = cal.date(byAdding: .day, value: 1, to: calNow) ?? calNow.addingTimeInterval(86_400)
+                let morning = cal.date(bySettingHour: 9, minute: 0, second: 0, of: next) ?? next
+                task.snooze(until: morning)
+            }
+            modelContext.insert(task)
         }
 
         // Completed items with actuals so similarity learning has something to chew on.

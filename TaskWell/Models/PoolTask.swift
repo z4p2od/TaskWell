@@ -202,6 +202,12 @@ final class PoolTask {
         touch()
     }
 
+    /// Clear snooze so the task can re-enter Suggest.
+    func unsnooze() {
+        snoozedUntil = nil
+        touch()
+    }
+
     var isSnoozed: Bool {
         guard let snoozedUntil else { return false }
         return snoozedUntil > Date()

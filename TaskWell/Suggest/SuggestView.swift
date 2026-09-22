@@ -12,6 +12,7 @@ struct SuggestView: View {
     @State private var selectedMood: SuggestMood?
     @State private var currentTask: PoolTask?
     @State private var showingActiveFocus = false
+    /// Session-only exclusions for this Suggest round. Never persisted; cleared on mood change / new pull reset.
     @State private var skippedIDs: Set<UUID> = []
     @State private var actionError: String?
     @State private var isDrawing = false
@@ -20,7 +21,9 @@ struct SuggestView: View {
     @State private var showCustomMood = false
     @State private var taskToEdit: PoolTask?
     @State private var taskAwaitingDone: PoolTask?
+    @State private var taskAwaitingSnooze: PoolTask?
     @State private var lastCustomDial = CustomSuggestDial.default
+    @State private var emptyRoundFromSkips = false
 
     private let scorer: any TaskSuggesting = LocalTaskScorer()
 
@@ -39,14 +42,7 @@ struct SuggestView: View {
                     heroHeader
 
                     if let actionError {
-                        ErrorBanner(message: actionError) {
-                            self.actionError = nil
-                            if let selectedMood {
-                                drawSuggestion(mood: selectedMood)
-                            } else {
-                                showCustomMood = true
-                            }
-                        }
+                        emptyRoundBanner
                     }
 
                     if showingActiveFocus, let active = activeTask {
@@ -68,6 +64,9 @@ struct SuggestView: View {
                                 showingActiveFocus = false
                                 selectedMood = nil
                                 currentTask = nil
+                                skippedIDs = []
+                                emptyRoundFromSkips = false
+                                actionError = nil
                             }
                         }
                         .font(.subheadline.weight(.medium))
@@ -80,7 +79,7 @@ struct SuggestView: View {
                             mode: .suggestion,
                             onAccept: { accept(currentTask) },
                             onSkip: { skip(currentTask, mood: selectedMood) },
-                            onSnooze: { snooze(currentTask, mood: selectedMood) }
+                            onSnooze: { beginSnooze(currentTask) }
                         )
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -133,7 +132,7 @@ struct SuggestView: View {
                 }
             }
             .sheet(isPresented: $showAdd) {
-                FreeTextCaptureSheet()
+                TaskEditorSheet(mode: .create)
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView()
@@ -144,6 +143,11 @@ struct SuggestView: View {
             .sheet(item: $taskAwaitingDone) { task in
                 DoneConfirmSheet(task: task) { duration, effort, enjoyment in
                     confirmDone(task, duration: duration, effort: effort, enjoyment: enjoyment)
+                }
+            }
+            .sheet(item: $taskAwaitingSnooze) { task in
+                SnoozePickerSheet(taskTitle: task.title) { until in
+                    applySnooze(task, until: until)
                 }
             }
             .sheet(isPresented: $showCustomMood) {
@@ -158,7 +162,51 @@ struct SuggestView: View {
         }
     }
 
-    /// Screenshot helpers: `-demoSuggestCard`, `-demoActiveCard`, `-demoCustomMood`, `-demoEditSheet`, `-demoAddSheet`.
+    @ViewBuilder
+    private var emptyRoundBanner: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if emptyRoundFromSkips {
+                ErrorBanner(message: actionError ?? "", retry: nil)
+
+                HStack(spacing: 12) {
+                    Button {
+                        clearSkipsAndRedraw()
+                    } label: {
+                        Text("Clear skips")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(TaskWellTheme.well)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            resetSuggestionOnly()
+                        }
+                    } label: {
+                        Text("Change mood")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(TaskWellTheme.wellDeep)
+                }
+            } else {
+                ErrorBanner(message: actionError ?? "") {
+                    self.actionError = nil
+                    if let selectedMood {
+                        drawSuggestion(mood: selectedMood)
+                    } else {
+                        showCustomMood = true
+                    }
+                }
+            }
+        }
+    }
+
+    /// Screenshot helpers: `-demoSuggestCard`, `-demoActiveCard`, `-demoCustomMood`, `-demoEditSheet`, `-demoAddSheet`, `-demoSnoozePicker`.
     private func autoDrawForDemoIfNeeded() {
         let args = ProcessInfo.processInfo.arguments
         if args.contains("-demoActiveCard") {
@@ -192,9 +240,13 @@ struct SuggestView: View {
             return
         }
 
-        if args.contains("-demoFreeText") {
+        if args.contains("-demoSnoozePicker") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                showAdd = true
+                if let first = openTasks.first(where: { !$0.isSnoozed && !$0.isActive }) {
+                    selectedMood = .preset(.easyWin)
+                    currentTask = first
+                    taskAwaitingSnooze = first
+                }
             }
             return
         }
@@ -383,6 +435,7 @@ struct SuggestView: View {
 
     private func drawSuggestion(mood: SuggestMood) {
         actionError = nil
+        emptyRoundFromSkips = false
         isDrawing = true
         selectedMood = mood
         showingActiveFocus = false
@@ -398,6 +451,7 @@ struct SuggestView: View {
                 currentTask = next
                 isDrawing = false
                 if next == nil {
+                    emptyRoundFromSkips = !skippedIDs.isEmpty
                     actionError = emptyFitMessage(for: mood)
                 }
             }
@@ -406,12 +460,24 @@ struct SuggestView: View {
 
     private func emptyFitMessage(for mood: SuggestMood) -> String {
         if !skippedIDs.isEmpty {
-            return "You’ve skipped through the matching tasks. Reset or adjust your mood."
+            return "You’ve seen everything that fits this mood. Change mood or clear skips."
         }
         if case .custom = mood {
             return "Nothing in the pool fits that time and appetite. Loosen a dial, or add a task that matches."
         }
         return "No open tasks fit that mood right now. Try another preset or add to the pool."
+    }
+
+    private func clearSkipsAndRedraw() {
+        guard let mood = selectedMood else {
+            skippedIDs = []
+            emptyRoundFromSkips = false
+            actionError = nil
+            return
+        }
+        skippedIDs = []
+        emptyRoundFromSkips = false
+        drawSuggestion(mood: mood)
     }
 
     private func accept(_ task: PoolTask) {
@@ -456,21 +522,30 @@ struct SuggestView: View {
                 showingActiveFocus = false
                 currentTask = nil
                 selectedMood = nil
+                skippedIDs = []
             }
         }
     }
 
+    /// Skip = this Suggest session only. Never writes snooze or other persisted state.
     private func skip(_ task: PoolTask, mood: SuggestMood) {
         skippedIDs.insert(task.id)
         drawSuggestion(mood: mood)
     }
 
-    private func snooze(_ task: PoolTask, mood: SuggestMood) {
-        let later = Calendar.current.date(byAdding: .hour, value: 4, to: Date()) ?? Date().addingTimeInterval(4 * 3600)
-        task.snooze(until: later)
-        skippedIDs.insert(task.id)
+    private func beginSnooze(_ task: PoolTask) {
+        taskAwaitingSnooze = task
+    }
+
+    /// Snooze sets `snoozedUntil` only — does not touch `skippedIDs`.
+    private func applySnooze(_ task: PoolTask, until: Date) {
+        task.snooze(until: until)
         persist("Couldn’t snooze that task. Try again.") {
-            drawSuggestion(mood: mood)
+            if let mood = selectedMood {
+                drawSuggestion(mood: mood)
+            } else {
+                currentTask = nil
+            }
         }
     }
 
@@ -479,6 +554,7 @@ struct SuggestView: View {
         currentTask = nil
         skippedIDs = []
         actionError = nil
+        emptyRoundFromSkips = false
         isDrawing = false
         showingActiveFocus = false
     }

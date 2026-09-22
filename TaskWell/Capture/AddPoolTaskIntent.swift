@@ -1,14 +1,14 @@
 import AppIntents
 import SwiftData
 
-/// Stubbed App Intent surface so Siri / Shortcuts / Action Button can plug in next.
-/// Not wired into the running UI yet; kept compile-ready for Phase 2 voice capture.
+/// Voice / Shortcuts entry: parse transcript off-screen, save a pool task.
+/// UI path remains structured `TaskEditorSheet`; this Intent is the future voice handoff.
 struct AddPoolTaskIntent: AppIntent {
     static let title: LocalizedStringResource = "Add TaskWell Task"
-    static let description = IntentDescription("Capture a task into the TaskWell pool.")
+    static let description = IntentDescription("Capture a task into the TaskWell pool from a short phrase or voice transcript.")
     static let openAppWhenRun: Bool = false
 
-    @Parameter(title: "Title")
+    @Parameter(title: "Title or phrase")
     var title: String
 
     @MainActor
@@ -18,16 +18,31 @@ struct AddPoolTaskIntent: AppIntent {
             return .result(dialog: "Add a title first.")
         }
 
+        let parser: any TaskCaptureParsing = NativeTaskCaptureParser()
+        let draft = parser.parse(trimmed, now: Date())
+        let resolvedTitle = draft.hasTitle
+            ? draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            : trimmed
+
         // Intent container is separate from the app UI container for now.
         // When Shortcuts shipping starts, share a single ModelContainer via an app group.
         let schema = Schema([PoolTask.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         let container = try ModelContainer(for: schema, configurations: [configuration])
         let context = ModelContext(container)
-        context.insert(PoolTask(title: trimmed))
+        context.insert(
+            PoolTask(
+                title: resolvedTitle,
+                dueDate: draft.dueDate,
+                effort: draft.effort,
+                enjoyment: draft.enjoyment,
+                durationMinutes: draft.durationMinutes,
+                rawCaptureText: trimmed
+            )
+        )
         try context.save()
 
-        return .result(dialog: "Added “\(trimmed)” to TaskWell.")
+        return .result(dialog: "Added “\(resolvedTitle)” to TaskWell.")
     }
 }
 

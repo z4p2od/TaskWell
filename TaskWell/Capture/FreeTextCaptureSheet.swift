@@ -1,8 +1,9 @@
 import SwiftUI
 import SwiftData
 
-/// Primary capture: free-text blob → parse preview chips → save.
-/// Structured editors live under “More options.”
+/// Reserved for future **voice → task** entry (Siri / App Intent / Action Button).
+/// Not presented from the normal + path anymore — structured `TaskEditorSheet` is primary.
+/// Keep parse + enrichment wired so voice can land pre-filled fields without a “Looks like” UI.
 struct FreeTextCaptureSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss

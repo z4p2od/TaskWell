@@ -20,10 +20,10 @@ struct TaskEditorSheet: View {
     @State private var enjoyment: EnjoymentLevel?
     @State private var durationMinutes: Int?
     @State private var saveError: String?
+    @State private var isSnoozedAtOpen: Bool
+    @State private var snoozeUntilLabel: String?
 
     @FocusState private var titleFocused: Bool
-
-    private let durationChoices = [5, 10, 15, 20, 30, 45, 60, 90, 120]
 
     init(mode: Mode = .create) {
         self.mode = mode
@@ -35,6 +35,8 @@ struct TaskEditorSheet: View {
             _effort = State(initialValue: nil)
             _enjoyment = State(initialValue: nil)
             _durationMinutes = State(initialValue: nil)
+            _isSnoozedAtOpen = State(initialValue: false)
+            _snoozeUntilLabel = State(initialValue: nil)
         case .edit(let task):
             _title = State(initialValue: task.title)
             _dueDate = State(initialValue: task.dueDate ?? Date())
@@ -42,6 +44,8 @@ struct TaskEditorSheet: View {
             _effort = State(initialValue: task.effort)
             _enjoyment = State(initialValue: task.enjoyment)
             _durationMinutes = State(initialValue: task.durationMinutes)
+            _isSnoozedAtOpen = State(initialValue: task.isSnoozed)
+            _snoozeUntilLabel = State(initialValue: task.snoozedUntil.map(Self.formatSnooze(_:)))
         }
     }
 
@@ -56,11 +60,11 @@ struct TaskEditorSheet: View {
                 Section {
                     TextField("What needs doing?", text: $title, axis: .vertical)
                         .font(.body)
-                        .lineLimit(2...5)
+                        .lineLimit(1...3)
                         .textInputAutocapitalization(.sentences)
                         .submitLabel(.done)
                         .focused($titleFocused)
-                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .topLeading)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .topLeading)
                         .contentShape(Rectangle())
                         .onTapGesture { titleFocused = true }
                 } header: {
@@ -71,6 +75,12 @@ struct TaskEditorSheet: View {
                             ? "Changes update this task only — they won’t mark it Done or start it."
                             : "Title is enough. Everything else is optional."
                     )
+                }
+
+                Section {
+                    DurationChipPicker(minutes: $durationMinutes)
+                } header: {
+                    Text("Rough duration")
                 }
 
                 Section("Optional details") {
@@ -98,11 +108,26 @@ struct TaskEditorSheet: View {
                                 .tag(Optional(level))
                         }
                     }
+                }
 
-                    Picker("Rough duration", selection: $durationMinutes) {
-                        Text("Not set").tag(Optional<Int>.none)
-                        ForEach(durationChoices, id: \.self) { minutes in
-                            Text(durationLabel(minutes)).tag(Optional(minutes))
+                if isSnoozedAtOpen, case .edit(let task) = mode {
+                    Section {
+                        Button {
+                            task.unsnooze()
+                            try? modelContext.save()
+                            isSnoozedAtOpen = false
+                            snoozeUntilLabel = nil
+                        } label: {
+                            Label("Wake now (unsnooze)", systemImage: "sun.max.fill")
+                                .foregroundStyle(TaskWellTheme.coral)
+                        }
+                    } header: {
+                        Text("Snoozed")
+                    } footer: {
+                        if let snoozeUntilLabel {
+                            Text("Hidden from Suggest until \(snoozeUntilLabel).")
+                        } else {
+                            Text("Hidden from Suggest until the snooze ends.")
                         }
                     }
                 }
@@ -129,13 +154,17 @@ struct TaskEditorSheet: View {
                 }
             }
             .onAppear {
-                // Delay one run-loop so the sheet presentation finishes, then open the keyboard.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    titleFocused = true
+                let args = ProcessInfo.processInfo.arguments
+                // Screenshots: keep keyboard closed so duration chips stay in frame.
+                let skipAutofocus = args.contains("-demoAddSheet")
+                if !skipAutofocus {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        titleFocused = true
+                    }
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents(isEditing ? [.medium, .large] : [.large, .medium])
         .presentationDragIndicator(.visible)
         .interactiveDismissDisabled(false)
     }
@@ -144,11 +173,14 @@ struct TaskEditorSheet: View {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func durationLabel(_ minutes: Int) -> String {
-        if minutes < 60 { return "\(minutes) min" }
-        let hours = minutes / 60
-        let rem = minutes % 60
-        return rem == 0 ? "\(hours) hr" : "\(hours) hr \(rem) min"
+    private static func formatSnooze(_ date: Date) -> String {
+        if Calendar.current.isDateInToday(date) {
+            return date.formatted(date: .omitted, time: .shortened)
+        }
+        if Calendar.current.isDateInTomorrow(date) {
+            return "Tomorrow \(date.formatted(date: .omitted, time: .shortened))"
+        }
+        return date.formatted(date: .abbreviated, time: .shortened)
     }
 
     private func save() {
